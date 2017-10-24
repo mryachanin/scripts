@@ -1,6 +1,9 @@
 #!/bin/bash
 
 ### Nukes a block device and installs archlinux
+### Usage: ./install-archlinux.sh [block device] [machine hostname]
+###   block device describes a linux block device such as a hard drive mounted at /dev/sdaX
+###   hostname describes the hostname for the newly installed machine
 
 ## Command line args
 EXPECTED_NUM_ARGS=2
@@ -35,7 +38,7 @@ KEYFILE_NAME='/crypto_keyfile.bin'
 NETWORK_TEST_HOST=www.google.com
 
 function usage_and_exit {
-    echo "usage: ./install-archlinux.sh <device> <hostname>"
+    echo "usage: ./install-archlinux.sh [block device] [machine hostname]"
     exit 1
 }
 
@@ -99,6 +102,9 @@ echo "Creating root partition..."
 exec_cmd sgdisk -n $ROOT_PART_NUM:0:$ROOT_PART_SIZE -t $ROOT_PART_NUM:$ROOT_PART_TYPE -c $ROOT_PART_NUM:$ROOT_PART_LABEL $DEVICE
 echo "Verifing disk post partition creation..."
 exec_cmd sgdisk -v
+
+# sleep to allow /dev/disk/by-part-label to be created
+sleep 1
 
 if [[ ! -b $EFI_PART_NAME ]]
 then
