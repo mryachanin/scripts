@@ -209,7 +209,7 @@ exec_cmd "echo '%wheel ALL=(ALL) ALL' > ${CRYPT_ROOT_MOUNT}/etc/sudoers.d/99-run
 
 if [[ $(prompt 'Intel chipset? [y/N] ') = "y" ]]
 then
-    pacman -S intel-ucode
+    exec_chroot_cmd pacman -S intel-ucode
 fi
 
 echo "Done!"
