@@ -37,12 +37,17 @@ KEYFILE_NAME='/crypto_keyfile.bin'
 ## Test params
 NETWORK_TEST_HOST=www.google.com
 
-function usage_and_exit {
+
+#######################
+## Utility Functions ##
+#######################
+
+usage_and_exit() {
     echo "usage: ./install-archlinux.sh [block device] [machine hostname]"
     exit 1
 }
 
-function exec_cmd {
+exec_cmd() {
     eval "$*"
     if [[ $? -ne 0 ]]
     then
@@ -51,11 +56,20 @@ function exec_cmd {
     fi
 }
 
-function exec_chroot_cmd {
+exec_chroot_cmd() {
     exec_cmd arch-chroot $CRYPT_ROOT_MOUNT "$*"
 }
 
-### Validate arguments and system
+prompt() {
+    read -p $1
+    echo $REPLY
+}
+
+
+#################
+## Validations ##
+#################
+
 if [[ $# -ne $EXPECTED_NUM_ARGS ]]
 then
     echo "Expected $EXPECTED_NUM_ARGS args but got $# args"
@@ -83,12 +97,17 @@ then
     exit 1
 fi
 
-read -p "Are you sure you want to nuke $DEVICE [y/n]? " NUKE_DEVICE
+read -p "Are you sure you want to nuke $DEVICE [y/N]? " NUKE_DEVICE
 if [[ ! $NUKE_DEVICE = "y" ]]
 then
     echo "Aborting installation."
     exit 1
 fi
+
+
+#############################
+## Start the installation! ##
+#############################
 
 ### Partition disk
 ## verify -> zap -> make efi partition -> make root partition -> verify
@@ -153,6 +172,8 @@ exec_cmd echo "127.0.0.1\ ${HOSTNAME}.localdomain\ $HOSTNAME" >> ${CRYPT_ROOT_MO
 echo "Enabling dhcpcd service..."
 exec_chroot_cmd systemctl enable dhcpcd
 
+# Set up crypto keyfile to only prompt disk encryption password once on boot
+# See: https://wiki.archlinux.org/index.php/Dm-crypt/Encrypting_an_entire_system#Configuring_fstab_and_crypttab_2
 echo "Creating crypto keyfile at ${KEYFILE_NAME}..."
 exec_chroot_cmd dd bs=512 count=8 if=/dev/urandom of=$KEYFILE_NAME
 echo "Changing permissions on ${KEYFILE_NAME} to 000..."
@@ -161,16 +182,37 @@ echo "Recursively changing permissions on ${BOOT_DIR} to 700..."
 exec_chroot_cmd chmod -R 700 $BOOT_DIR
 echo "Adding crypto keyfile to root partition so you don't need to enter your password twice on boot..."
 exec_chroot_cmd cryptsetup luksAddKey $ROOT_PART_NAME $KEYFILE_NAME
+
 echo "Configuring initramfs..."
 exec_chroot_cmd sed -i 's,FILES=\"\",FILES=\"'$KEYFILE_NAME'\",g' /etc/mkinitcpio.conf
 exec_chroot_cmd sed -i 's,block,keyboard\ block\ encrypt,g' /etc/mkinitcpio.conf
 exec_chroot_cmd mkinitcpio -p linux
+
 echo "Configuring grub..."
 exec_chroot_cmd sed -i 's,GRUB_CMDLINE_LINUX=\"\",GRUB_CMDLINE_LINUX=\"cryptdevice=/dev/disk/by-partlabel/'${ROOT_PART_LABEL}':cryptroot\",g' /etc/default/grub
 exec_cmd echo 'GRUB_ENABLE_CRYPTODISK=y' >> ${CRYPT_ROOT_MOUNT}/etc/default/grub
 exec_chroot_cmd grub-mkconfig -o /boot/grub/grub.cfg
 exec_chroot_cmd grub-install --target=x86_64-efi --efi-directory=$EFI_DIR --bootloader-id=grub --recheck
+
 echo "Setting new root password..."
 exec_chroot_cmd passwd
 
+# Configure user
+read -p 'Enter a username: ' USERNAME
+exec_chroot_cmd useradd -G wheel -m $USERNAME
+echo "Creating user account: $USERNAME"
+echo "Setting new user password..."
+exec_chroot_cmd passwd $USERNAME
+
+# Allow user to run-as root - what's the worst that could happen?
+exec_cmd echo '%wheel ALL=(ALL) ALL' > ${CRYPT_ROOT_MOUNT}/etc/sudoers.d/99-run-as-root
+
+if [[ $(prompt 'Intel chipset? [y/N] ') = "y" ]]
+then
+    pacman -S intel-ucode
+fi
+
 echo "Done!"
+
+# References:
+#  - https://wiki.archlinux.org/index.php/Dm-crypt/Encrypting_an_entire_system#Encrypted_boot_partition_.28GRUB.29
