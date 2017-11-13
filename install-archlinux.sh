@@ -61,7 +61,7 @@ exec_chroot_cmd() {
 }
 
 prompt() {
-    read -p $1
+    read -p "$1"
     echo $REPLY
 }
 
@@ -205,7 +205,7 @@ echo "Setting new user password..."
 exec_chroot_cmd passwd $USERNAME
 
 # Allow user to run-as root - what's the worst that could happen?
-exec_cmd echo '%wheel ALL=(ALL) ALL' > ${CRYPT_ROOT_MOUNT}/etc/sudoers.d/99-run-as-root
+exec_cmd "echo '%wheel ALL=(ALL) ALL' > ${CRYPT_ROOT_MOUNT}/etc/sudoers.d/99-run-as-root"
 
 if [[ $(prompt 'Intel chipset? [y/N] ') = "y" ]]
 then
