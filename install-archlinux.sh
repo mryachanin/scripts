@@ -230,6 +230,7 @@ echo "Setting new user password..."
 exec_chroot_cmd passwd $USERNAME
 
 # Allow user to run-as root - what's the worst that could happen?
+mkdir -p ${ROOT_MOUNT}/etc/sudoers.d/
 exec_cmd "echo '%wheel ALL=(ALL) ALL' > ${ROOT_MOUNT}/etc/sudoers.d/99-run-as-root"
 
 if [[ $(prompt 'Intel chipset? [y/N] ') = "y" ]]
