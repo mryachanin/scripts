@@ -174,19 +174,10 @@ exec_cmd echo "127.0.0.1\ ${HOSTNAME}.localdomain\ $HOSTNAME" >> ${CRYPT_ROOT_MO
 echo "Enabling dhcpcd service..."
 exec_chroot_cmd systemctl enable dhcpcd
 
-# Set up crypto keyfile to only prompt disk encryption password once on boot
-# See: https://wiki.archlinux.org/index.php/Dm-crypt/Encrypting_an_entire_system#Configuring_fstab_and_crypttab_2
-echo "Creating crypto keyfile at ${KEYFILE_NAME}..."
-exec_chroot_cmd dd bs=512 count=8 if=/dev/urandom of=$KEYFILE_NAME
-echo "Changing permissions on ${KEYFILE_NAME} to 000..."
-exec_chroot_cmd chmod 000 $KEYFILE_NAME
 echo "Recursively changing permissions on ${BOOT_DIR} to 700..."
 exec_chroot_cmd chmod -R 700 $BOOT_DIR
-echo "Adding crypto keyfile to root partition so you don't need to enter your password twice on boot..."
-exec_chroot_cmd cryptsetup luksAddKey $ROOT_PART_NAME $KEYFILE_NAME
 
 echo "Configuring initramfs..."
-exec_chroot_cmd sed -i 's,FILES=\"\",FILES=\"'$KEYFILE_NAME'\",g' /etc/mkinitcpio.conf
 exec_chroot_cmd sed -i 's,block,keyboard\ block\ encrypt,g' /etc/mkinitcpio.conf
 exec_chroot_cmd mkinitcpio -p linux
 
