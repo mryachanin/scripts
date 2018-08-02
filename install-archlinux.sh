@@ -38,7 +38,7 @@ ROOT_PART_NUM=3
 ROOT_PART_SIZE=0
 ROOT_PART_TYPE=8300
 
-# Mount point constants
+## Mount point constants
 ROOT_MOUNT=/mnt
 BOOT_DIR=/boot
 EFI_DIR=${BOOT_DIR}/efi
@@ -47,6 +47,8 @@ EFI_MOUNT=${ROOT_MOUNT}${EFI_DIR}
 ## System validation constants
 NETWORK_TEST_HOST=www.google.com
 
+## Other constants
+DEFAULT_PROGRAMS="openssh git vim sudo"
 
 #######################
 ## Utility Functions ##
@@ -237,6 +239,9 @@ if [[ $(prompt 'Intel chipset? [y/N] ') = "y" ]]
 then
     exec_chroot_cmd pacman -S intel-ucode
 fi
+
+# Install default programs after the main install is done
+exec_chroot_cmd pacman -S ${DEFAULT_PROGRAMS}
 
 echo "Done!"
 
