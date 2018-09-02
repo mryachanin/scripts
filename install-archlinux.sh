@@ -1,12 +1,16 @@
 #!/bin/bash
 
-### Nukes a block device and installs archlinux
+###############################################################################
+### install-archlinux.sh nukes a block device and installs archlinux
 ### Usage: ./install-archlinux.sh [block device] [machine hostname]
-###   block device describes a linux block device such as a hard drive mounted at /dev/sdaX
-###   hostname describes the hostname for the newly installed machine
-### Note: You may need to increase the size of your ArchLinux boot disk's tmpfs in order to
-###   install git. You can do so by running:
-###   `mount -o remount,size=2G /run/archiso/cowspace`
+###   block device describes a linux block device such as a hard drive mounted
+###   at /dev/sdaX hostname describes the hostname for the newly installed
+###   machine.
+### Note: You may need to increase the size of your ArchLinux boot disk's tmpfs
+###    in order to install git. You can do so by running:
+###    `mount -o remount,size=2G /run/archiso/cowspace`
+###############################################################################
+
 ## Command line args
 EXPECTED_NUM_ARGS=2
 DEVICE=$1
