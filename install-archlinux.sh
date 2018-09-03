@@ -121,9 +121,9 @@ then
 fi
 
 
-#############################
-## Start the installation! ##
-#############################
+#######################
+## Prep installation ##
+#######################
 
 ### Partition disk
 ## verify -> zap -> make efi partition -> make root partition -> verify
@@ -191,13 +191,22 @@ exec_cmd mount $EFI_PART_PATH $EFI_MOUNT
 echo "Enabling swap partition"
 exec_cmd swapon -L ${SWAP_PART_UNCRYPT_LABEL}
 
-### Install ArchLinux
+
+#######################
+## Install Archlinux ##
+#######################
+
 # Prefer RIT's mirrorlist. Gotta show some school spirit!
 exec_cmd sed -i '/rit/!d' /etc/pacman.d/mirrorlist
 echo "Bootstraping ArchLinux with pacstrap"
 exec_cmd pacstrap $ROOT_MOUNT base grub efibootmgr
 echo "Running genfstab"
 exec_cmd genfstab -t PARTLABEL $ROOT_MOUNT >> ${ROOT_MOUNT}/etc/fstab
+
+
+############################
+## Configure installation ##
+############################
 
 echo "Setting locale..."
 exec_chroot_cmd ln -fs /usr/share/zoneinfo/America/Los_Angeles /etc/localtime
@@ -226,12 +235,12 @@ exec_chroot_cmd grub-mkconfig -o /boot/grub/grub.cfg
 exec_chroot_cmd grub-install --target=x86_64-efi --efi-directory=$EFI_DIR --bootloader-id=grub --recheck
 
 echo "Disabling root account"
-# Change the password to some garbage
+# Change the password to some garbage.
 exec_chroot_cmd "echo root:`base64 /dev/urandom | head -c 100` | chpasswd"
 # Lock the account cause why not!
 exec_chroot_cmd passwd -l root
 
-# Configure a new user since the root account is now disabled
+# Configure a new user since the root account is now disabled.
 # Allow user to run-as root - what's the worst that could happen?
 echo "Creating a new user account with sudo privileges"
 read -p 'Enter a username: ' USERNAME
@@ -242,12 +251,13 @@ exec_chroot_cmd passwd $USERNAME
 mkdir -p ${ROOT_MOUNT}/etc/sudoers.d/
 exec_cmd "echo '%wheel ALL=(ALL) ALL' > ${ROOT_MOUNT}/etc/sudoers.d/99-run-as-root"
 
+# Install microcode updates from intel.
 if [[ $(prompt 'Intel chipset? [y/N] ') = "y" ]]
 then
     exec_chroot_cmd pacman -S intel-ucode
 fi
 
-# Install default programs after the main install is done
+# Install default programs after the main install is done.
 exec_chroot_cmd pacman -S ${DEFAULT_PROGRAMS}
 
 echo "Done!"
