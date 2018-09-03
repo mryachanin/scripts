@@ -20,7 +20,17 @@ HOSTNAME=$2
 DEV_BY_PART=/dev/disk/by-partlabel/
 DEV_MAP=/dev/mapper/
 
+# EFI system partition (ESP) for UEFI boot
+EFI_PART_NUM=1
+EFI_PART_SIZE=+550M # 550M per https://wiki.archlinux.org/index.php/EFI_system_partition#Create_the_partition
+EFI_PART_TYPE=ef00  # ef00 = EFI system partition type.
+EFI_PART_LABEL=esp
+EFI_PART_PATH=${DEV_BY_PART}${EFI_PART_LABEL}
+
 # LUKS partition which LVM will reside on.
+LUKS_PART_NUM=2
+LUKS_PART_SIZE=0    # 0 means allocate all of the remaining space.
+LUKS_PART_TYPE=8300 # 8300 = linux filesystem partition type.
 LUKS_PART_CRYPT_LABEL=cryptlvm
 LUKS_PART_CRYPT_PATH=${DEV_BY_PART}${LUKS_PART_CRYPT_LABEL}
 LUKS_PART_UNCRYPT_LABEL=lvm
@@ -35,7 +45,8 @@ SWAP_LV_PATH=${DEV_MAP}${VG_NAME}-${SWAP_LV_NAME}
 SWAP_LV_SIZE=`free -g --si | grep Mem | awk '{print $2}'`G
 
 # Mount point constants.
-ROOT_MOUNT=/mnt
+ROOT_MOUNT_PATH=/mnt
+EFI_MOUNT_PATH=/mnt/efi
 
 # System validation constants.
 NETWORK_TEST_HOST=www.google.com
@@ -63,7 +74,7 @@ exec_cmd() {
 }
 
 exec_chroot_cmd() {
-    exec_cmd arch-chroot ${ROOT_MOUNT} "$*"
+    exec_cmd arch-chroot ${ROOT_MOUNT_PATH} "$*"
 }
 
 prompt() {
@@ -123,11 +134,10 @@ exec_cmd sgdisk --verify
 echo "Removing any partition info from disk..."
 exec_cmd sgdisk --zap-all ${DEVICE}
 
-# 8300 = linux filesystem partition type.
-# The 0:0 in --new allocates all of the space.
 echo "Creating a single partition to be encrypted by LUKS. EFI boot, swap, and root partitions will be created on top of that LUKS volume using LVM."
 sgdisk \
-  --new=1:0:0 --typecode=1:8300 --change-name=1:${LUKS_PART_CRYPT_LABEL} \
+  --new=${EFI_PART_NUM}:0:${EFI_PART_SIZE}   --typecode=${EFI_PART_NUM}:${EFI_PART_TYPE}   --change-name=${EFI_PART_NUM}:${EFI_PART_LABEL} \
+  --new=${LUKS_PART_NUM}:0:${LUKS_PART_SIZE} --typecode=${LUKS_PART_NUM}:${LUKS_PART_TYPE} --change-name=${LUKS_PART_NUM}:${LUKS_PART_CRYPT_LABEL} \
   ${DEVICE}
 
 echo "Verifing disk post partition creation..."
@@ -136,7 +146,13 @@ exec_cmd sgdisk --verify
 # Sleep to allow /dev/disk/by-part-label to be created.
 sleep 1
 
-# Verify new partition exists.
+# Verify new partitions exist.
+if [[ ! -b ${EFI_PART_PATH} ]]
+then
+    echo "EFI partition was not correctly identified. Tried to use: ${EFI_PART_PATH}"
+    exit 1
+fi
+
 if [[ ! -b ${LUKS_PART_CRYPT_PATH} ]]
 then
     echo "LUKS partition was not correctly identified. Tried to use: ${LUKS_PART_CRYPT_PATH}"
@@ -181,10 +197,17 @@ echo "Formatting root partition as ext4"
 exec_cmd mkfs.ext4 ${ROOT_LV_PATH}
 
 # Mount partitions.
-echo "Mounting root partition"
-exec_cmd mount ${ROOT_LV_PATH} ${ROOT_MOUNT}
+echo "Mounting root partition to ${ROOT_MOUNT_PATH}"
+exec_cmd mount ${ROOT_LV_PATH} ${ROOT_MOUNT_PATH}
 echo "Enabling swap partition"
 exec_cmd swapon ${SWAP_LV_PATH}
+
+# Format and mount EFI partition.
+echo "Formatting EFI partition as FAT32"
+exec_cmd mkfs.vfat ${EFI_PART_PATH}
+echo "Mounting EFI partition to ${EFI_MOUNT_PATH}"
+exec_cmd mkdir -p ${EFI_MOUNT_PATH}
+exec_cmd mount ${EFI_PART_PATH} ${EFI_MOUNT_PATH}
 
 
 #######################
@@ -194,9 +217,9 @@ exec_cmd swapon ${SWAP_LV_PATH}
 # Prefer RIT's mirrorlist. Gotta show some school spirit!
 exec_cmd sed -i '/rit/!d' /etc/pacman.d/mirrorlist
 echo "Bootstraping ArchLinux with pacstrap"
-exec_cmd pacstrap ${ROOT_MOUNT} base grub efibootmgr
+exec_cmd pacstrap ${ROOT_MOUNT_PATH} base grub efibootmgr
 echo "Running genfstab"
-exec_cmd genfstab -t PARTLABEL ${ROOT_MOUNT} >> ${ROOT_MOUNT}/etc/fstab
+exec_cmd genfstab -t PARTLABEL ${ROOT_MOUNT_PATH} >> ${ROOT_MOUNT_PATH}/etc/fstab
 
 
 ############################
@@ -207,12 +230,12 @@ echo "Setting locale..."
 exec_chroot_cmd ln -fs /usr/share/zoneinfo/America/Los_Angeles /etc/localtime
 exec_chroot_cmd sed -i 's/#en_US.UTF-8/en_US.UTF-8/g' /etc/locale.gen
 exec_chroot_cmd locale-gen
-exec_cmd echo 'LANG=en_US.UTF-8' > ${ROOT_MOUNT}/etc/locale.conf
+exec_cmd echo 'LANG=en_US.UTF-8' > ${ROOT_MOUNT_PATH}/etc/locale.conf
 echo "Setting hardware clock..."
 exec_chroot_cmd hwclock --systohc
 echo "Setting hostname to ${HOSTNAME}..."
-exec_cmd echo ${HOSTNAME} >> ${ROOT_MOUNT}/etc/hostname
-exec_cmd echo "127.0.0.1\ ${HOSTNAME}.localdomain\ ${HOSTNAME}" >> ${ROOT_MOUNT}/etc/hosts
+exec_cmd echo ${HOSTNAME} >> ${ROOT_MOUNT_PATH}/etc/hostname
+exec_cmd echo "127.0.0.1\ ${HOSTNAME}.localdomain\ ${HOSTNAME}" >> ${ROOT_MOUNT_PATH}/etc/hosts
 echo "Enabling dhcpcd service..."
 exec_chroot_cmd systemctl enable dhcpcd
 
@@ -225,9 +248,15 @@ exec_chroot_cmd mkinitcpio -p linux
 
 echo "Configuring grub..."
 exec_chroot_cmd sed -i 's,GRUB_CMDLINE_LINUX=\"\",GRUB_CMDLINE_LINUX=\"cryptdevice=${LUKS_PART_CRYPT_PATH}:${LUKS_PART_UNCRYPT_LABEL}\ resume=${SWAP_LV_PATH}\",g' /etc/default/grub
-exec_chroot_cmd echo 'GRUB_ENABLE_CRYPTODISK=y' >> ${ROOT_MOUNT}/etc/default/grub
+exec_chroot_cmd echo 'GRUB_ENABLE_CRYPTODISK=y' >> ${ROOT_MOUNT_PATH}/etc/default/grub
 exec_chroot_cmd grub-mkconfig -o /boot/grub/grub.cfg
-exec_chroot_cmd grub-install --recheck ${DEVICE}
+# Including the device path is not necessary.
+# Per https://wiki.archlinux.org/index.php/GRUB#Installation_2
+#   You might note the absence of a device_path option (e.g.: /dev/sda) in the
+#   grub-install command. In fact any device_path provided will be ignored by
+#   the GRUB UEFI install script. Indeed, UEFI bootloaders do not use a MBR
+#   bootcode or partition boot sector at all.
+exec_chroot_cmd grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB --recheck
 
 echo "Disabling root account"
 # Change the password to some garbage.
@@ -244,8 +273,8 @@ exec_chroot_cmd useradd -G wheel -m ${USERNAME}
 echo "Creating user account: ${USERNAME}"
 echo "Changing password for new user account..."
 exec_chroot_cmd passwd ${USERNAME}
-mkdir -p ${ROOT_MOUNT}/etc/sudoers.d/
-exec_cmd "echo '%wheel ALL=(ALL) ALL' > ${ROOT_MOUNT}/etc/sudoers.d/99-run-as-root"
+mkdir -p ${ROOT_MOUNT_PATH}/etc/sudoers.d/
+exec_cmd "echo '%wheel ALL=(ALL) ALL' > ${ROOT_MOUNT_PATH}/etc/sudoers.d/99-run-as-root"
 
 # Install microcode updates from intel.
 if [[ $(prompt 'Intel chipset? [y/N] ') = "y" ]]
