@@ -9,50 +9,42 @@
 ### Note: You may need to increase the size of your ArchLinux boot disk's tmpfs
 ###    in order to install git. You can do so by running:
 ###    `mount -o remount,size=2G /run/archiso/cowspace`
+### TODO:
+###   * Prefer ${VAR} over $VAR
 ###############################################################################
 
-## Command line args
+# Command line args.
 EXPECTED_NUM_ARGS=2
 DEVICE=$1
 HOSTNAME=$2
 
-## Device constants
+# Device constants.
 DEV_BY_PART=/dev/disk/by-partlabel/
 DEV_MAP=/dev/mapper/
 
-EFI_PART_LABEL=EFI
-EFI_PART_PATH=${DEV_BY_PART}${EFI_PART_LABEL}
-EFI_PART_NUM=1
-EFI_PART_SIZE=+512M
-EFI_PART_TYPE=ef00
+# LUKS partition which LVM will reside on.
+LUKS_PART_CRYPT_LABEL=cryptlvm
+LUKS_PART_CRYPT_PATH=${DEV_BY_PART}${LUKS_PART_CRYPT_LABEL}
+LUKS_PART_UNCRYPT_LABEL=lvm
+LUKS_PART_UNCRYPT_PATH=${DEV_MAP}${LUKS_PART_UNCRYPT_LABEL}
 
-SWAP_PART_CRYPT_LABEL=cryptswap
-SWAP_PART_CRYPT_PATH=${DEV_BY_PART}${SWAP_PART_CRYPT_LABEL}
-SWAP_PART_UNCRYPT_LABEL=swap
-SWAP_PART_UNCRYPT_PATH=${DEV_MAP}${SWAP_PART_UNCRYPT_LABEL}
-SWAP_PART_NUM=2
-SWAP_PART_SIZE=`free -g --si | grep Mem | awk '{print $2}'`G
-SWAP_PART_TYPE=8200
+# LVM
+VG_NAME=vg
+ROOT_LV_NAME=root
+ROOT_LV_PATH=${DEV_MAP}${VG_NAME}-${ROOT_LV_NAME}
+SWAP_LV_NAME=swap
+SWAP_LV_PATH=${DEV_MAP}${VG_NAME}-${SWAP_LV_NAME}
+SWAP_LV_SIZE=`free -g --si | grep Mem | awk '{print $2}'`G
 
-ROOT_PART_CRYPT_LABEL=cryptroot
-ROOT_PART_CRYPT_PATH=${DEV_BY_PART}${ROOT_PART_CRYPT_LABEL}
-ROOT_PART_UNCRYPT_LABEL=root
-ROOT_PART_UNCRYPT_PATH=${DEV_MAP}${ROOT_PART_UNCRYPT_LABEL}
-ROOT_PART_NUM=3
-ROOT_PART_SIZE=0
-ROOT_PART_TYPE=8300
-
-## Mount point constants
+# Mount point constants.
 ROOT_MOUNT=/mnt
-BOOT_DIR=/boot
-EFI_DIR=${BOOT_DIR}/efi
-EFI_MOUNT=${ROOT_MOUNT}${EFI_DIR}
 
-## System validation constants
+# System validation constants.
 NETWORK_TEST_HOST=www.google.com
 
-## Other constants
+# Default programs to be installed at the end of setup.
 DEFAULT_PROGRAMS="openssh git vim sudo"
+
 
 #######################
 ## Utility Functions ##
@@ -121,75 +113,80 @@ then
 fi
 
 
-#######################
-## Prep installation ##
-#######################
+####################
+## Partition disk ##
+####################
 
-### Partition disk
-## verify -> zap -> make efi partition -> make root partition -> verify
+# Partition disk.
+#   verify -> zap -> make efi partition -> make root partition -> verify
 echo "Verifying disk..."
 exec_cmd sgdisk --verify
 
 echo "Removing any partition info from disk..."
 exec_cmd sgdisk --zap-all $DEVICE
 
-echo "Creating EFI boot, swap, and root partitions..."
+# 8300 = linux filesystem partition type.
+# The 0:0 in --new allocates all of the space.
+echo "Creating a single partition to be encrypted by LUKS. EFI boot, swap, and root partitions will be created on top of that LUKS volume using LVM."
 sgdisk \
-  --new=$EFI_PART_NUM:0:$EFI_PART_SIZE   --typecode=$EFI_PART_NUM:$EFI_PART_TYPE   --change-name=$EFI_PART_NUM:$EFI_PART_LABEL         \
-  --new=$SWAP_PART_NUM:0:$SWAP_PART_SIZE --typecode=$SWAP_PART_NUM:$SWAP_PART_TYPE --change-name=$SWAP_PART_NUM:$SWAP_PART_CRYPT_LABEL \
-  --new=$ROOT_PART_NUM:0:$ROOT_PART_SIZE --typecode=$ROOT_PART_NUM:$ROOT_PART_TYPE --change-name=$ROOT_PART_NUM:$ROOT_PART_CRYPT_LABEL \
+  --new=1:0:0 --typecode=1:8300 --change-name=1:$LUKS_PART_CRYPT_LABEL \
   $DEVICE
 
 echo "Verifing disk post partition creation..."
 exec_cmd sgdisk --verify
 
-# Sleep to allow /dev/disk/by-part-label to be created
+# Sleep to allow /dev/disk/by-part-label to be created.
 sleep 1
 
-# Verify new partitions exist
-if [[ ! -b $EFI_PART_PATH ]]
+# Verify new partition exists.
+if [[ ! -b ${LUKS_PART_CRYPT_PATH} ]]
 then
-    echo "EFI partition was not correctly identified. Tried to use: $EFI_PART_PATH"
+    echo "LUKS partition was not correctly identified. Tried to use: ${LUKS_PART_CRYPT_PATH}"
     exit 1
 fi
 
-if [[ ! -b $SWAP_PART_CRYPT_PATH ]]
-then
-    echo "Swap partition was not correctly identified. Tried to use $SWAP_PART_CRYPT_PATH"
-    exit 1
-fi
+# Create the encrypted volume for LVM.
+echo "Creating an encrypted volume on partition: ${LUKS_PART_CRYPT_PATH}"
+exec_cmd cryptsetup --cipher aes-xts-plain64 --key-size 512 --hash sha512 --iter-time 5000 --use-urandom luksFormat ${LUKS_PART_CRYPT_PATH}
 
-if [[ ! -b $ROOT_PART_CRYPT_PATH ]]
-then
-    echo "Root partition was not correctly identified. Tried to use $ROOT_PART_CRYPT_PATH"
-    exit 1
-fi
+# Open/mount the new encrypted volume for LVM.
+echo "Opening volume on partition ${LUKS_PART_CRYPT_PATH} at ${LUKS_PART_UNCRYPT_PATH}"
+exec_cmd cryptsetup luksOpen ${LUKS_PART_CRYPT_PATH} ${LUKS_PART_UNCRYPT_LABEL}
 
-### Create an encrypted root partition
-echo "Encrypting partition $ROOT_PART_CRYPT_PATH"
-exec_cmd cryptsetup --cipher aes-xts-plain64 --key-size 512 --hash sha512 --iter-time 5000 --use-urandom luksFormat $ROOT_PART_CRYPT_PATH
-echo "Opening partition $ROOT_PART_CRYPT_PATH at $ROOT_PART_UNCRYPT_PATH"
-exec_cmd cryptsetup luksOpen $ROOT_PART_CRYPT_PATH $ROOT_PART_UNCRYPT_LABEL
 
-echo "Creating encrypted swap partition"
-cryptsetup open --type plain --key-file /dev/urandom ${SWAP_PART_CRYPT_PATH} ${SWAP_PART_UNCRYPT_LABEL}
+################################
+## Set up LVM logical volumes ##
+################################
 
-### Format partitions
-echo "Formatting EFI boot partition as FAT32"
-exec_cmd mkfs.vfat $EFI_PART_PATH
+# LVM wiki - https://wiki.archlinux.org/index.php/LVM
+# Physical volume (PV)
+#     Partition on hard disk (or even the disk itself or loopback file) on which you can have volume groups. It has a special header and is divided into physical extents. Think of physical volumes as big building blocks used to build your hard drive.
+# Volume group (VG)
+#     Group of physical volumes used as a storage volume (as one disk). They contain logical volumes. Think of volume groups as hard drives.
+# Logical volume (LV)
+#     A "virtual/logical partition" that resides in a volume group and is composed of physical extents. Think of logical volumes as normal partitions.
+
+# Create LVM physical volume on the encrypted partition that was just opened.
+pvcreate $LUKS_PART_UNCRYPT_PATH
+
+# Create LVM volume group using the LVM physical volume just created.
+vgcreate $VG_NAME $LUKS_PART_UNCRYPT_PATH
+
+# Create LVM logical volumes for installation.
+lvcreate -L $SWAP_LV_SIZE $VG_NAME -n $SWAP_LV_NAME
+lvcreate -l +100%FREE       $VG_NAME -n $ROOT_LV_NAME
+
+# Format logical volumes.
 echo "Formatting swap partition"
-exec_cmd mkswap -L ${SWAP_PART_UNCRYPT_LABEL} ${SWAP_PART_UNCRYPT_PATH}
+exec_cmd mkswap -L ${SWAP_LV_NAME} ${SWAP_LV_PATH}
 echo "Formatting root partition as ext4"
-exec_cmd mkfs.ext4 $ROOT_PART_UNCRYPT_PATH
+exec_cmd mkfs.ext4 ${ROOT_LV_PATH}
 
-### Mount partitions
+# Mount partitions.
 echo "Mounting root partition"
-exec_cmd mount $ROOT_PART_UNCRYPT_PATH $ROOT_MOUNT
-echo "Mounting EFI partition"
-exec_cmd mkdir -p $EFI_MOUNT
-exec_cmd mount $EFI_PART_PATH $EFI_MOUNT
+exec_cmd mount ${ROOT_LV_PATH} ${ROOT_MOUNT}
 echo "Enabling swap partition"
-exec_cmd swapon -L ${SWAP_PART_UNCRYPT_LABEL}
+exec_cmd swapon ${SWAP_LV_PATH}
 
 
 #######################
@@ -221,23 +218,24 @@ exec_cmd echo "127.0.0.1\ ${HOSTNAME}.localdomain\ $HOSTNAME" >> ${ROOT_MOUNT}/e
 echo "Enabling dhcpcd service..."
 exec_chroot_cmd systemctl enable dhcpcd
 
-echo "Recursively changing permissions on ${BOOT_DIR} to 700..."
-exec_chroot_cmd chmod -R 700 $BOOT_DIR
+echo "Recursively changing permissions on /boot to 700..."
+exec_chroot_cmd chmod -R 700 /boot
 
 echo "Configuring initramfs..."
-exec_chroot_cmd sed -i 's,block,keyboard\ block\ encrypt,g' /etc/mkinitcpio.conf
+exec_chroot_cmd sed -i 's,block,keyboard\ block\ encrypt\ lvm2\ resume,g' /etc/mkinitcpio.conf
 exec_chroot_cmd mkinitcpio -p linux
 
 echo "Configuring grub..."
-exec_chroot_cmd sed -i 's,GRUB_CMDLINE_LINUX=\"\",GRUB_CMDLINE_LINUX=\"cryptdevice='${ROOT_PART_CRYPT_PATH}':${ROOT_PART_UNCRYPT_LABEL}\",g' /etc/default/grub
-exec_cmd echo 'GRUB_ENABLE_CRYPTODISK=y' >> ${ROOT_MOUNT}/etc/default/grub
+exec_chroot_cmd sed -i 's,GRUB_CMDLINE_LINUX=\"\",GRUB_CMDLINE_LINUX=\"cryptdevice=${LUKS_PART_CRYPT_PATH}:${LUKS_PART_UNCRYPT_LABEL}\ resume=${SWAP_LV_PATH}\",g' /etc/default/grub
+exec_chroot_cmd echo 'GRUB_ENABLE_CRYPTODISK=y' >> ${ROOT_MOUNT}/etc/default/grub
 exec_chroot_cmd grub-mkconfig -o /boot/grub/grub.cfg
-exec_chroot_cmd grub-install --target=x86_64-efi --efi-directory=$EFI_DIR --bootloader-id=grub --recheck
+exec_chroot_cmd grub-install --recheck ${DEVICE}
 
 echo "Disabling root account"
 # Change the password to some garbage.
 exec_chroot_cmd "echo root:`base64 /dev/urandom | head -c 100` | chpasswd"
 # Lock the account cause why not!
+#   Ref: https://wiki.archlinux.org/index.php/Sudo#Disable_root_login
 exec_chroot_cmd passwd -l root
 
 # Configure a new user since the root account is now disabled.
@@ -263,5 +261,6 @@ exec_chroot_cmd pacman -S ${DEFAULT_PROGRAMS}
 echo "Done!"
 
 # References:
+#  - https://web.archive.org/web/20180117044934/http://www.pavelkogan.com:80/2014/05/23/luks-full-disk-encryption
 #  - https://wiki.archlinux.org/index.php/Dm-crypt/Encrypting_an_entire_system#Encrypted_boot_partition_.28GRUB.29
 #  - https://wiki.archlinux.org/index.php/User:Altercation/Bullet_Proof_Arch_Install
