@@ -225,17 +225,20 @@ exec_cmd echo 'GRUB_ENABLE_CRYPTODISK=y' >> ${ROOT_MOUNT}/etc/default/grub
 exec_chroot_cmd grub-mkconfig -o /boot/grub/grub.cfg
 exec_chroot_cmd grub-install --target=x86_64-efi --efi-directory=$EFI_DIR --bootloader-id=grub --recheck
 
-echo "Setting new root password..."
-exec_chroot_cmd passwd
+echo "Disabling root account"
+# Change the password to some garbage
+exec_chroot_cmd "echo root:`base64 /dev/urandom | head -c 100` | chpasswd"
+# Lock the account cause why not!
+exec_chroot_cmd passwd -l root
 
-# Configure user
+# Configure a new user since the root account is now disabled
+# Allow user to run-as root - what's the worst that could happen?
+echo "Creating a new user account with sudo privileges"
 read -p 'Enter a username: ' USERNAME
 exec_chroot_cmd useradd -G wheel -m $USERNAME
 echo "Creating user account: $USERNAME"
-echo "Setting new user password..."
+echo "Changing password for new user account..."
 exec_chroot_cmd passwd $USERNAME
-
-# Allow user to run-as root - what's the worst that could happen?
 mkdir -p ${ROOT_MOUNT}/etc/sudoers.d/
 exec_cmd "echo '%wheel ALL=(ALL) ALL' > ${ROOT_MOUNT}/etc/sudoers.d/99-run-as-root"
 
