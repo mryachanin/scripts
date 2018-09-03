@@ -9,8 +9,6 @@
 ### Note: You may need to increase the size of your ArchLinux boot disk's tmpfs
 ###    in order to install git. You can do so by running:
 ###    `mount -o remount,size=2G /run/archiso/cowspace`
-### TODO:
-###   * Prefer ${VAR} over $VAR
 ###############################################################################
 
 # Command line args.
@@ -65,12 +63,12 @@ exec_cmd() {
 }
 
 exec_chroot_cmd() {
-    exec_cmd arch-chroot $ROOT_MOUNT "$*"
+    exec_cmd arch-chroot ${ROOT_MOUNT} "$*"
 }
 
 prompt() {
     read -p "$1"
-    echo $REPLY
+    echo ${REPLY}
 }
 
 
@@ -78,15 +76,15 @@ prompt() {
 ## Validations ##
 #################
 
-if [[ $# -ne $EXPECTED_NUM_ARGS ]]
+if [[ $# -ne ${EXPECTED_NUM_ARGS} ]]
 then
-    echo "Expected $EXPECTED_NUM_ARGS args but got $# args"
+    echo "Expected ${EXPECTED_NUM_ARGS} args but got $# args"
     usage_and_exit
 fi
 
-if [[ ! -b $DEVICE ]]
+if [[ ! -b ${DEVICE} ]]
 then
-    echo "$DEVICE is not a block device"
+    echo "${DEVICE} is not a block device"
     usage_and_exit
 fi
 
@@ -98,15 +96,15 @@ then
 fi
 
 echo "Testing network connection..."
-ping -c 3 $NETWORK_TEST_HOST 1>/dev/null
+ping -c 3 ${NETWORK_TEST_HOST} 1>/dev/null
 if [[ $? -ne 0 ]]
 then
-    echo "Could not ping $NETWORK_TEST_HOST. Ensure network and DNS is working."
+    echo "Could not ping ${NETWORK_TEST_HOST}. Ensure network and DNS is working."
     exit 1
 fi
 
-read -p "Are you sure you want to nuke $DEVICE [y/N]? " NUKE_DEVICE
-if [[ ! $NUKE_DEVICE = "y" ]]
+read -p "Are you sure you want to nuke ${DEVICE} [y/N]? " NUKE_DEVICE
+if [[ ! ${NUKE_DEVICE} = "y" ]]
 then
     echo "Aborting installation."
     exit 1
@@ -123,14 +121,14 @@ echo "Verifying disk..."
 exec_cmd sgdisk --verify
 
 echo "Removing any partition info from disk..."
-exec_cmd sgdisk --zap-all $DEVICE
+exec_cmd sgdisk --zap-all ${DEVICE}
 
 # 8300 = linux filesystem partition type.
 # The 0:0 in --new allocates all of the space.
 echo "Creating a single partition to be encrypted by LUKS. EFI boot, swap, and root partitions will be created on top of that LUKS volume using LVM."
 sgdisk \
-  --new=1:0:0 --typecode=1:8300 --change-name=1:$LUKS_PART_CRYPT_LABEL \
-  $DEVICE
+  --new=1:0:0 --typecode=1:8300 --change-name=1:${LUKS_PART_CRYPT_LABEL} \
+  ${DEVICE}
 
 echo "Verifing disk post partition creation..."
 exec_cmd sgdisk --verify
@@ -167,14 +165,14 @@ exec_cmd cryptsetup luksOpen ${LUKS_PART_CRYPT_PATH} ${LUKS_PART_UNCRYPT_LABEL}
 #     A "virtual/logical partition" that resides in a volume group and is composed of physical extents. Think of logical volumes as normal partitions.
 
 # Create LVM physical volume on the encrypted partition that was just opened.
-pvcreate $LUKS_PART_UNCRYPT_PATH
+pvcreate ${LUKS_PART_UNCRYPT_PATH}
 
 # Create LVM volume group using the LVM physical volume just created.
-vgcreate $VG_NAME $LUKS_PART_UNCRYPT_PATH
+vgcreate ${VG_NAME} ${LUKS_PART_UNCRYPT_PATH}
 
 # Create LVM logical volumes for installation.
-lvcreate -L $SWAP_LV_SIZE $VG_NAME -n $SWAP_LV_NAME
-lvcreate -l +100%FREE       $VG_NAME -n $ROOT_LV_NAME
+lvcreate -L ${SWAP_LV_SIZE} ${VG_NAME} -n ${SWAP_LV_NAME}
+lvcreate -l +100%FREE       ${VG_NAME} -n ${ROOT_LV_NAME}
 
 # Format logical volumes.
 echo "Formatting swap partition"
@@ -196,9 +194,9 @@ exec_cmd swapon ${SWAP_LV_PATH}
 # Prefer RIT's mirrorlist. Gotta show some school spirit!
 exec_cmd sed -i '/rit/!d' /etc/pacman.d/mirrorlist
 echo "Bootstraping ArchLinux with pacstrap"
-exec_cmd pacstrap $ROOT_MOUNT base grub efibootmgr
+exec_cmd pacstrap ${ROOT_MOUNT} base grub efibootmgr
 echo "Running genfstab"
-exec_cmd genfstab -t PARTLABEL $ROOT_MOUNT >> ${ROOT_MOUNT}/etc/fstab
+exec_cmd genfstab -t PARTLABEL ${ROOT_MOUNT} >> ${ROOT_MOUNT}/etc/fstab
 
 
 ############################
@@ -213,8 +211,8 @@ exec_cmd echo 'LANG=en_US.UTF-8' > ${ROOT_MOUNT}/etc/locale.conf
 echo "Setting hardware clock..."
 exec_chroot_cmd hwclock --systohc
 echo "Setting hostname to ${HOSTNAME}..."
-exec_cmd echo $HOSTNAME >> ${ROOT_MOUNT}/etc/hostname
-exec_cmd echo "127.0.0.1\ ${HOSTNAME}.localdomain\ $HOSTNAME" >> ${ROOT_MOUNT}/etc/hosts
+exec_cmd echo ${HOSTNAME} >> ${ROOT_MOUNT}/etc/hostname
+exec_cmd echo "127.0.0.1\ ${HOSTNAME}.localdomain\ ${HOSTNAME}" >> ${ROOT_MOUNT}/etc/hosts
 echo "Enabling dhcpcd service..."
 exec_chroot_cmd systemctl enable dhcpcd
 
@@ -242,10 +240,10 @@ exec_chroot_cmd passwd -l root
 # Allow user to run-as root - what's the worst that could happen?
 echo "Creating a new user account with sudo privileges"
 read -p 'Enter a username: ' USERNAME
-exec_chroot_cmd useradd -G wheel -m $USERNAME
-echo "Creating user account: $USERNAME"
+exec_chroot_cmd useradd -G wheel -m ${USERNAME}
+echo "Creating user account: ${USERNAME}"
 echo "Changing password for new user account..."
-exec_chroot_cmd passwd $USERNAME
+exec_chroot_cmd passwd ${USERNAME}
 mkdir -p ${ROOT_MOUNT}/etc/sudoers.d/
 exec_cmd "echo '%wheel ALL=(ALL) ALL' > ${ROOT_MOUNT}/etc/sudoers.d/99-run-as-root"
 
