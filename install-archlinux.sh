@@ -71,8 +71,8 @@ exec_cmd() {
     eval "$*"
     if [[ $? -ne 0 ]]
     then
-	echo "Could not execute command: $*"
-	exit 1
+        echo "Could not execute command: $*"
+        exit 1
     fi
 }
 
