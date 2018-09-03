@@ -9,6 +9,9 @@
 ### Note: You may need to increase the size of your ArchLinux boot disk's tmpfs
 ###    in order to install git. You can do so by running:
 ###    `mount -o remount,size=2G /run/archiso/cowspace`
+### TODO:
+###   * Add retry loop on user entries that could fail
+###     (e.g. entering password for LuksOpen)
 ###############################################################################
 
 # Command line args.
@@ -279,11 +282,11 @@ exec_cmd "echo '%wheel ALL=(ALL) ALL' > ${ROOT_MOUNT_PATH}/etc/sudoers.d/99-run-
 # Install microcode updates from intel.
 if [[ $(prompt 'Intel chipset? [y/N] ') = "y" ]]
 then
-    exec_chroot_cmd pacman -S intel-ucode
+    exec_chroot_cmd yes | pacman -S intel-ucode
 fi
 
 # Install default programs after the main install is done.
-exec_chroot_cmd pacman -S ${DEFAULT_PROGRAMS}
+exec_chroot_cmd yes | pacman -S ${DEFAULT_PROGRAMS}
 
 echo "Done!"
 
