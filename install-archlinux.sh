@@ -261,11 +261,11 @@ exec_chroot_cmd grub-mkconfig -o /boot/grub/grub.cfg
 #   bootcode or partition boot sector at all.
 exec_chroot_cmd grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB --recheck
 
-echo "Disabling root account"
-# Change the password to some garbage.
-exec_chroot_cmd "echo root:`base64 /dev/urandom | head -c 100` | chpasswd"
-# Lock the account cause why not!
-#   Ref: https://wiki.archlinux.org/index.php/Sudo#Disable_root_login
+echo "Disabling root account in preference of a user account with sudo"
+echo "Changing root password to something random..."
+exec_chroot_cmd echo "root:`base64 /dev/urandom | tr -d '[:space:]' | head -c 100`" | tee chpasswd
+# Ref: https://wiki.archlinux.org/index.php/Sudo#Disable_root_login
+echo "Locking the root account too because why not!"
 exec_chroot_cmd passwd -l root
 
 # Configure a new user since the root account is now disabled.
