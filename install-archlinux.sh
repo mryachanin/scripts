@@ -10,8 +10,10 @@
 ###    in order to install git. You can do so by running:
 ###    `mount -o remount,size=2G /run/archiso/cowspace`
 ### TODO:
-###   * Add retry loop on user entries that could fail
-###     (e.g. entering password for LuksOpen)
+###   * DEFAULT_PROGRAMS are not being installed in the chroot.
+###   * Add retry loop on user entries that could fail.
+###   * Add cryptokey file so passwords aren't required twice on boot?
+###       http://www.pavelkogan.com:80/2014/05/23/luks-full-disk-encryption#bonus-login-once
 ###############################################################################
 
 # Command line args.
