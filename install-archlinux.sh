@@ -49,7 +49,8 @@ SWAP_LV_SIZE=`free -g --si | grep Mem | awk '{print $2}'`G
 
 # Mount point constants.
 ROOT_MOUNT_PATH=/mnt
-EFI_MOUNT_PATH=/mnt/efi
+EFI_CHROOT_MOUNT_PATH=/efi
+EFI_MOUNT_PATH=${ROOT_MOUNT_PATH}${EFI_CHROOT_MOUNT_PATH}
 
 # System validation constants.
 NETWORK_TEST_HOST=www.google.com
@@ -259,7 +260,7 @@ exec_chroot_cmd grub-mkconfig -o /boot/grub/grub.cfg
 #   grub-install command. In fact any device_path provided will be ignored by
 #   the GRUB UEFI install script. Indeed, UEFI bootloaders do not use a MBR
 #   bootcode or partition boot sector at all.
-exec_chroot_cmd grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB --recheck
+exec_chroot_cmd grub-install --target=x86_64-efi --efi-directory=${EFI_CHROOT_MOUNT_PATH} --bootloader-id=GRUB --recheck
 
 echo "Disabling root account in preference of a user account with sudo"
 echo "Changing root password to something random..."
