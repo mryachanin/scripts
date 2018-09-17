@@ -248,9 +248,9 @@ exec_chroot_cmd chmod -R 700 /boot
 
 # Allow logging in with single password prompt.
 # https://www.pavelkogan.com/2014/05/23/luks-full-disk-encryption/#bonus-login-once
-exec_chroot_cmd dd bs=512 count=4 if=/dev/urandom of=${CRYPTO_KEY_PATH}
-exec_chroot_cmd cryptsetup luksAddKey ${DEVICE} ${CRYPTO_KEY_PATH}
-exec_chroot_cmd sed -i "s,Files=(),Files=(${CRYPTO_KEY_PATH}),g" /etc/mkinitcpio.conf
+exec_cmd dd bs=512 count=4 if=/dev/urandom of=${ROOT_MOUNT_PATH}${CRYPTO_KEY_PATH}
+exec_cmd cryptsetup luksAddKey ${LUKS_PART_CRYPT_PATH} ${ROOT_MOUNT_PATH}${CRYPTO_KEY_PATH}
+exec_chroot_cmd sed -i '"s,FILES=(),FILES=(${CRYPTO_KEY_PATH}),g"' /etc/mkinitcpio.conf
 
 echo "Configuring initramfs..."
 exec_chroot_cmd sed -i 's,block,keyboard\ block\ encrypt\ lvm2\ resume,g' /etc/mkinitcpio.conf
