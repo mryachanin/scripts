@@ -10,11 +10,11 @@
 ###    in order to install git. You can do so by running:
 ###    `mount -o remount,size=2G /run/archiso/cowspace`
 ### TODO:
-###   * DEFAULT_PROGRAMS are not being installed in the chroot.
 ###   * Add retry loop on user entries that could fail.
-###   * Add cryptokey file so passwords aren't required twice on boot?
-###       http://www.pavelkogan.com:80/2014/05/23/luks-full-disk-encryption#bonus-login-once
 ###############################################################################
+
+# Default programs to be installed at the end of setup.
+DEFAULT_PROGRAMS="openssh git vim sudo"
 
 # Command line args.
 EXPECTED_NUM_ARGS=2
@@ -53,12 +53,10 @@ SWAP_LV_SIZE=`free -g --si | grep Mem | awk '{print $2}'`G
 ROOT_MOUNT_PATH=/mnt
 EFI_CHROOT_MOUNT_PATH=/efi
 EFI_MOUNT_PATH=${ROOT_MOUNT_PATH}${EFI_CHROOT_MOUNT_PATH}
+CRYPTO_KEY_PATH=/crypto_keyfile.bin
 
 # System validation constants.
 NETWORK_TEST_HOST=www.google.com
-
-# Default programs to be installed at the end of setup.
-DEFAULT_PROGRAMS="openssh git vim sudo"
 
 
 #######################
@@ -223,7 +221,7 @@ exec_cmd mount ${EFI_PART_PATH} ${EFI_MOUNT_PATH}
 # Prefer RIT's mirrorlist. Gotta show some school spirit!
 exec_cmd sed -i '/rit/!d' /etc/pacman.d/mirrorlist
 echo "Bootstraping ArchLinux with pacstrap"
-exec_cmd pacstrap ${ROOT_MOUNT_PATH} base grub efibootmgr
+exec_cmd pacstrap ${ROOT_MOUNT_PATH} base grub efibootmgr ${DEFAULT_PROGRAMS}
 echo "Running genfstab"
 exec_cmd genfstab -t PARTLABEL ${ROOT_MOUNT_PATH} >> ${ROOT_MOUNT_PATH}/etc/fstab
 
@@ -247,6 +245,12 @@ exec_chroot_cmd systemctl enable dhcpcd
 
 echo "Recursively changing permissions on /boot to 700..."
 exec_chroot_cmd chmod -R 700 /boot
+
+# Allow logging in with single password prompt.
+# https://www.pavelkogan.com/2014/05/23/luks-full-disk-encryption/#bonus-login-once
+exec_chroot_cmd dd bs=512 count=4 if=/dev/urandom of=${CRYPTO_KEY_PATH}
+exec_chroot_cmd cryptsetup luksAddKey ${DEVICE} ${CRYPTO_KEY_PATH}
+exec_chroot_cmd sed -i "s,Files=(),Files=(${CRYPTO_KEY_PATH}),g" /etc/mkinitcpio.conf
 
 echo "Configuring initramfs..."
 exec_chroot_cmd sed -i 's,block,keyboard\ block\ encrypt\ lvm2\ resume,g' /etc/mkinitcpio.conf
@@ -285,11 +289,8 @@ exec_cmd "echo '%wheel ALL=(ALL) ALL' > ${ROOT_MOUNT_PATH}/etc/sudoers.d/99-run-
 # Install microcode updates from intel.
 if [[ $(prompt 'Intel chipset? [y/N] ') = "y" ]]
 then
-    exec_chroot_cmd yes | pacman -S intel-ucode
+    exec_chroot_cmd "yes | pacman -S intel-ucode"
 fi
-
-# Install default programs after the main install is done.
-exec_chroot_cmd yes | pacman -S ${DEFAULT_PROGRAMS}
 
 echo "Done!"
 
