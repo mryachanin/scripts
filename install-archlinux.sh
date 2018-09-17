@@ -293,6 +293,12 @@ then
     exec_chroot_cmd "pacman -S intel-ucode"
 fi
 
+# Install wifi drivers if this is a laptop.
+if [[ $(prompt 'Is this a laptop? [y/N] ') = "y" ]]
+then
+    exec_chroot_cmd "pacman -S wpa_supplicant"
+fi
+
 echo "Done!"
 
 # References:
