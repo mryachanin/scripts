@@ -289,7 +289,7 @@ exec_cmd "echo '%wheel ALL=(ALL) ALL' > ${ROOT_MOUNT_PATH}/etc/sudoers.d/99-run-
 # Install microcode updates from intel.
 if [[ $(prompt 'Intel chipset? [y/N] ') = "y" ]]
 then
-    exec_chroot_cmd "yes | pacman -S intel-ucode"
+    exec_chroot_cmd "pacman -S intel-ucode"
 fi
 
 echo "Done!"
