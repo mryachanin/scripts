@@ -271,7 +271,7 @@ exec_chroot_cmd grub-install --target=x86_64-efi --efi-directory=${EFI_CHROOT_MO
 
 echo "Disabling root account in preference of a user account with sudo"
 echo "Changing root password to something random..."
-exec_chroot_cmd echo "root:`base64 /dev/urandom | tr -d '[:space:]' | head -c 100`" | tee chpasswd
+exec_chroot_cmd echo "root:`base64 /dev/urandom | tr -d '[:space:]' | head -c 100`" | chpasswd
 # Ref: https://wiki.archlinux.org/index.php/Sudo#Disable_root_login
 echo "Locking the root account too because why not!"
 exec_chroot_cmd passwd -l root
