@@ -221,7 +221,7 @@ exec_cmd mount ${EFI_PART_PATH} ${EFI_MOUNT_PATH}
 # Prefer RIT's mirrorlist. Gotta show some school spirit!
 exec_cmd sed -i '/rit/!d' /etc/pacman.d/mirrorlist
 echo "Bootstraping ArchLinux with pacstrap"
-exec_cmd pacstrap ${ROOT_MOUNT_PATH} base grub efibootmgr ${DEFAULT_PROGRAMS}
+exec_cmd pacstrap ${ROOT_MOUNT_PATH} base grub-efi-x86_64 efibootmgr ${DEFAULT_PROGRAMS}
 echo "Running genfstab"
 exec_cmd genfstab -t PARTLABEL ${ROOT_MOUNT_PATH} >> ${ROOT_MOUNT_PATH}/etc/fstab
 
