@@ -14,7 +14,7 @@
 ###############################################################################
 
 # Default programs to be installed at the end of setup.
-DEFAULT_PROGRAMS="openssh git vim sudo"
+DEFAULT_PROGRAMS="base-devel openssh git vim sudo"
 
 # Command line args.
 EXPECTED_NUM_ARGS=2
