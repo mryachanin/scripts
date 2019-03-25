@@ -260,7 +260,6 @@ exec_chroot_cmd mkinitcpio -p linux
 echo "Configuring grub..."
 exec_chroot_cmd sed -i 's,GRUB_CMDLINE_LINUX=\"\",GRUB_CMDLINE_LINUX=\"cryptdevice=${LUKS_PART_CRYPT_PATH}:${LUKS_PART_UNCRYPT_LABEL}\ resume=${SWAP_LV_PATH}\",g' /etc/default/grub
 exec_chroot_cmd echo 'GRUB_ENABLE_CRYPTODISK=y' >> ${ROOT_MOUNT_PATH}/etc/default/grub
-exec_chroot_cmd grub-mkconfig -o /boot/grub/grub.cfg
 # Including the device path is not necessary.
 # Per https://wiki.archlinux.org/index.php/GRUB#Installation_2
 #   You might note the absence of a device_path option (e.g.: /dev/sda) in the
@@ -268,6 +267,7 @@ exec_chroot_cmd grub-mkconfig -o /boot/grub/grub.cfg
 #   the GRUB UEFI install script. Indeed, UEFI bootloaders do not use a MBR
 #   bootcode or partition boot sector at all.
 exec_chroot_cmd grub-install --target=x86_64-efi --efi-directory=${EFI_CHROOT_MOUNT_PATH} --bootloader-id=GRUB --recheck
+exec_chroot_cmd grub-mkconfig -o /boot/grub/grub.cfg
 
 echo "Disabling root account in preference of a user account with sudo"
 echo "Changing root password to something random..."
