@@ -51,7 +51,7 @@ SWAP_LV_SIZE=`free -g --si | grep Mem | awk '{print $2}'`G
 
 # Mount point constants.
 ROOT_MOUNT_PATH=/mnt
-EFI_CHROOT_MOUNT_PATH=/efi
+EFI_CHROOT_MOUNT_PATH=/boot/efi
 EFI_MOUNT_PATH=${ROOT_MOUNT_PATH}${EFI_CHROOT_MOUNT_PATH}
 CRYPTO_KEY_PATH=/crypto_keyfile.bin
 
