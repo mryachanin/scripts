@@ -14,7 +14,7 @@
 ###############################################################################
 
 # Default programs to be installed at the end of setup.
-DEFAULT_PROGRAMS="base base-devel dhcpcd git mkinitcpio openssh sudo vim"
+DEFAULT_PROGRAMS="base base-devel dhcpcd git linux linux-firmware mkinitcpio openssh sudo vim"
 
 # Command line args.
 EXPECTED_NUM_ARGS=2
