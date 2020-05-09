@@ -165,7 +165,7 @@ fi
 
 # Create the encrypted volume for LVM.
 echo "Creating an encrypted volume on partition: ${LUKS_PART_CRYPT_PATH}"
-exec_cmd cryptsetup --cipher aes-xts-plain64 --key-size 512 --hash sha512 --iter-time 5000 --use-urandom luksFormat ${LUKS_PART_CRYPT_PATH}
+exec_cmd cryptsetup --cipher aes-xts-plain64 --key-size 512 --hash sha512 --iter-time 5000 --use-urandom --type luks1 luksFormat ${LUKS_PART_CRYPT_PATH}
 
 # Open/mount the new encrypted volume for LVM.
 echo "Opening volume on partition ${LUKS_PART_CRYPT_PATH} at ${LUKS_PART_UNCRYPT_PATH}"
