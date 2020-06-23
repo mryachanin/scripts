@@ -1,6 +1,9 @@
 # make sure all packages are up-to-date
 sudo pacman -Syy
 
+# Access the AUR
+./install-yay.sh
+
 # base GUI
 sudo pacman -S xf86-video-intel xorg lightdm lightdm-gtk-greeter i3 dmenu xfce4-terminal
 sudo systemctl enable lightdm
@@ -9,7 +12,7 @@ sudo systemctl enable lightdm
 sudo pacman -S nemo syncthing syncthing-gtk
 
 # dev tools
-sudo pacman -S code git firefox zsh
+sudo pacman -S git firefox visual-studio-code-bin zsh
 ssh-keygen -t rsa -b 8196
 usermod -s /bin/zsh $USER
 
