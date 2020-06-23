@@ -10,6 +10,7 @@ sudo pacman -S nemo syncthing syncthing-gtk
 
 # dev tools
 sudo pacman -S git zsh
+ssh-keygen -t rsa -b 8196
 usermod -s /bin/zsh $USER
 
 # fonts
