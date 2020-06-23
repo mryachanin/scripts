@@ -9,7 +9,7 @@ sudo systemctl enable lightdm
 sudo pacman -S nemo syncthing syncthing-gtk
 
 # dev tools
-sudo pacman -S git firefox zsh
+sudo pacman -S code git firefox zsh
 ssh-keygen -t rsa -b 8196
 usermod -s /bin/zsh $USER
 
