@@ -10,6 +10,7 @@ sudo pacman -S nemo syncthing syncthing-gtk
 
 # dev tools
 sudo pacman -S git zsh
+usermod -s /bin/zsh $USER
 
 # fonts
 sudo pacman -S ttf-dejavu ttf-liberation noto-fonts
