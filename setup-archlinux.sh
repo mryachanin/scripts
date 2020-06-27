@@ -13,7 +13,11 @@ sudo pacman -S nemo syncthing syncthing-gtk
 
 # dev tools
 sudo pacman -S git firefox visual-studio-code-bin zsh
+## .Net
+sudo pacman -S dotnet-runtime dotnet-sdk
+## Generate SSH key
 ssh-keygen -t rsa -b 8196
+## Set shell to zsh
 usermod -s /bin/zsh $USER
 
 # fonts
