@@ -28,3 +28,6 @@ sudo pacman -S htop openssh tmux vim
 
 # audio
 sudo pacman -S pulseaudio pulseaudio-alsa pavucontrol
+
+# image tools
+sudo pacman -S feh
