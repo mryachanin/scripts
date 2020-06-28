@@ -12,7 +12,7 @@ sudo systemctl enable lightdm
 sudo pacman -S nemo syncthing syncthing-gtk
 
 # dev tools
-sudo pacman -S git firefox visual-studio-code-bin zsh
+sudo pacman -S git firefox tree visual-studio-code-bin zsh
 ## .Net
 sudo pacman -S dotnet-runtime dotnet-sdk
 ## Generate SSH key
