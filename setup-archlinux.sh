@@ -35,3 +35,6 @@ sudo pacman -S pulseaudio pulseaudio-alsa pavucontrol
 
 # image tools
 sudo pacman -S feh
+
+# document tools
+sudo pacman -S libreoffice-fresh
