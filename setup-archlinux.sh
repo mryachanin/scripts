@@ -15,7 +15,7 @@ sudo pacman -S pulseaudio pulseaudio-alsa pavucontrol
 sudo pacman -S signal-desktop
 
 # data
-sudo pacman -S nemo syncthing syncthing-gtk
+sudo pacman -S nemo smbclient syncthing syncthing-gtk
 
 # dev tools
 sudo pacman -S git firefox tree visual-studio-code-bin zsh
