@@ -41,3 +41,7 @@ sudo systemctl enable NetworkManager
 
 # ops tools
 sudo pacman -S htop openssh tmux vim
+
+# printer
+sudo pacman -S cups cups-pdf
+sudo systemctl enable org.cups.cupsd.service
