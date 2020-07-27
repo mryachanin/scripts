@@ -16,6 +16,7 @@ sudo pacman -S signal-desktop
 
 # data
 sudo pacman -S nemo smbclient syncthing syncthing-gtk
+sudo yay -S standardnotes-desktop
 
 # dev tools
 sudo pacman -S git firefox tree visual-studio-code-bin zsh
@@ -27,13 +28,16 @@ ssh-keygen -t rsa -b 8196
 usermod -s /bin/zsh $USER
 
 # document tools
-sudo pacman -S libreoffice-fresh
+sudo pacman -S evince libreoffice-fresh
 
 # fonts
 sudo pacman -S ttf-dejavu ttf-liberation noto-fonts
 
 # image tools
 sudo pacman -S feh
+
+# media tools
+sudo pacman -S vlc
 
 # networking
 sudo pacman -S networkmanager network-manager-applet
