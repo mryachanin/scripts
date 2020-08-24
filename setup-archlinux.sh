@@ -31,7 +31,10 @@ usermod -s /bin/zsh $USER
 sudo pacman -S evince libreoffice-fresh
 
 # fonts
-sudo pacman -S ttf-dejavu ttf-liberation noto-fonts
+## Install jp fonts because no shrug no life
+sudo pacman -S ttf-dejavu ttf-liberation noto-fonts adobe-source-han-sans-jp-fonts
+sudo sed -i 's/#ja_JP.UTF-8/ja_JP.UTF-8/g' /etc/locale.gen
+sudo locale-gen
 
 # image tools
 sudo pacman -S feh
@@ -42,6 +45,7 @@ sudo pacman -S vlc
 # networking
 sudo pacman -S networkmanager network-manager-applet
 sudo systemctl enable NetworkManager
+sudo systemctl start NetworkManager
 
 # ops tools
 sudo pacman -S htop openssh tmux vim
@@ -49,3 +53,9 @@ sudo pacman -S htop openssh tmux vim
 # printer
 sudo pacman -S cups cups-pdf
 sudo systemctl enable org.cups.cupsd.service
+sudo systemctl start org.cups.cupsd.service
+
+# time
+sudo pacman -S ntp
+sudo systemctl enable ntpd
+sudo systemctl start ntpd
