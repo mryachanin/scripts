@@ -57,5 +57,4 @@ sudo systemctl start org.cups.cupsd.service
 
 # time
 sudo pacman -S ntp
-sudo systemctl enable ntpd
-sudo systemctl start ntpd
+sudo timedatectl set-ntp true
