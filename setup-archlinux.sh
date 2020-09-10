@@ -11,6 +11,11 @@ sudo systemctl enable lightdm
 # audio
 sudo pacman -S pulseaudio pulseaudio-alsa pavucontrol
 
+# bluetooth
+sudo pacman -S bluez bluez-utils gnome-bluetooth gnome-shell gnome-control-center
+sudo systemctl enable bluetooth.service
+sudo systemctl start bluetooth.service
+
 # communication
 sudo pacman -S signal-desktop
 
