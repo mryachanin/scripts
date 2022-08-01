@@ -13,6 +13,9 @@
 ###   * Add retry loop on user entries that could fail.
 ###############################################################################
 
+# Encrypt data?
+ENCRYPT_DATA=true
+
 # Default programs to be installed at the end of setup.
 DEFAULT_PROGRAMS="base base-devel dhcpcd linux linux-firmware lvm2 man-db man-pages mkinitcpio sudo texinfo vim"
 
@@ -163,13 +166,20 @@ then
     exit 1
 fi
 
-# Create the encrypted volume for LVM.
-echo "Creating an encrypted volume on partition: ${LUKS_PART_CRYPT_PATH}"
-exec_cmd cryptsetup --cipher aes-xts-plain64 --key-size 512 --hash sha512 --iter-time 5000 --use-urandom --type luks1 luksFormat ${LUKS_PART_CRYPT_PATH}
+if $ENCRYPT_DATA
+then
+    # Create the encrypted volume for LVM.
+    echo "Creating an encrypted volume on partition: ${LUKS_PART_CRYPT_PATH}"
+    exec_cmd cryptsetup --cipher aes-xts-plain64 --key-size 512 --hash sha512 --iter-time 5000 --use-urandom --type luks1 luksFormat ${LUKS_PART_CRYPT_PATH}
 
-# Open/mount the new encrypted volume for LVM.
-echo "Opening volume on partition ${LUKS_PART_CRYPT_PATH} at ${LUKS_PART_UNCRYPT_PATH}"
-exec_cmd cryptsetup luksOpen ${LUKS_PART_CRYPT_PATH} ${LUKS_PART_UNCRYPT_LABEL}
+    # Open/mount the new encrypted volume for LVM.
+    echo "Opening volume on partition ${LUKS_PART_CRYPT_PATH} at ${LUKS_PART_UNCRYPT_PATH}"
+    exec_cmd cryptsetup luksOpen ${LUKS_PART_CRYPT_PATH} ${LUKS_PART_UNCRYPT_LABEL}
+else
+    echo "Skipping encryption of partition ${LUKS_PART_CRYPT_PATH}"
+    echo "Symlinking ${LUKS_PART_CRYPT_PATH} to ${LUKS_PART_UNCRYPT_PATH}"
+    ln -s ${LUKS_PART_CRYPT_PATH} ${LUKS_PART_UNCRYPT_PATH}
+fi
 
 
 ################################
@@ -246,20 +256,34 @@ exec_chroot_cmd systemctl enable dhcpcd
 echo "Recursively changing permissions on /boot to 700..."
 exec_chroot_cmd chmod -R 700 /boot
 
-# Allow logging in with single password prompt.
-# https://www.pavelkogan.com/2014/05/23/luks-full-disk-encryption/#bonus-login-once
-exec_cmd dd bs=512 count=4 if=/dev/urandom of=${ROOT_MOUNT_PATH}${CRYPTO_KEY_PATH}
-exec_cmd chmod 000 ${ROOT_MOUNT_PATH}${CRYPTO_KEY_PATH}
-exec_cmd cryptsetup luksAddKey ${LUKS_PART_CRYPT_PATH} ${ROOT_MOUNT_PATH}${CRYPTO_KEY_PATH}
-exec_chroot_cmd sed -i '"s,FILES=(),FILES=(${CRYPTO_KEY_PATH}),g"' /etc/mkinitcpio.conf
+if $ENCRYPT_DATA
+then
+    # Allow logging in with single password prompt.
+    # https://www.pavelkogan.com/2014/05/23/luks-full-disk-encryption/#bonus-login-once
+    exec_cmd dd bs=512 count=4 if=/dev/urandom of=${ROOT_MOUNT_PATH}${CRYPTO_KEY_PATH}
+    exec_cmd chmod 000 ${ROOT_MOUNT_PATH}${CRYPTO_KEY_PATH}
+    exec_cmd cryptsetup luksAddKey ${LUKS_PART_CRYPT_PATH} ${ROOT_MOUNT_PATH}${CRYPTO_KEY_PATH}
+    exec_chroot_cmd sed -i '"s,FILES=(),FILES=(${CRYPTO_KEY_PATH}),g"' /etc/mkinitcpio.conf
+fi
 
 echo "Configuring initramfs..."
-exec_chroot_cmd sed -i 's,block,keyboard\ block\ encrypt\ lvm2\ resume,g' /etc/mkinitcpio.conf
+if $ENCRYPT_DATA
+then
+    exec_chroot_cmd sed -i 's,block,keyboard\ block\ encrypt\ lvm2\ resume,g' /etc/mkinitcpio.conf
+else
+    exec_chroot_cmd sed -i 's,block,keyboard\ block\ lvm2\ resume,g' /etc/mkinitcpio.conf
+fi
 exec_chroot_cmd mkinitcpio -p linux
 
 echo "Configuring grub..."
-exec_chroot_cmd sed -i 's,GRUB_CMDLINE_LINUX=\"\",GRUB_CMDLINE_LINUX=\"cryptdevice=${LUKS_PART_CRYPT_PATH}:${LUKS_PART_UNCRYPT_LABEL}\ resume=${SWAP_LV_PATH}\",g' /etc/default/grub
-exec_chroot_cmd echo 'GRUB_ENABLE_CRYPTODISK=y' >> ${ROOT_MOUNT_PATH}/etc/default/grub
+if $ENCRYPT_DATA
+then
+    exec_chroot_cmd sed -i 's,GRUB_CMDLINE_LINUX=\"\",GRUB_CMDLINE_LINUX=\"cryptdevice=${LUKS_PART_CRYPT_PATH}:${LUKS_PART_UNCRYPT_LABEL}\ resume=${SWAP_LV_PATH}\",g' /etc/default/grub
+    exec_chroot_cmd echo 'GRUB_ENABLE_CRYPTODISK=y' >> ${ROOT_MOUNT_PATH}/etc/default/grub
+else
+    exec_chroot_cmd sed -i 's,GRUB_CMDLINE_LINUX=\"\",GRUB_CMDLINE_LINUX=\"resume=${SWAP_LV_PATH}\",g' /etc/default/grub
+fi
+
 # Including the device path is not necessary.
 # Per https://wiki.archlinux.org/index.php/GRUB#Installation_2
 #   You might note the absence of a device_path option (e.g.: /dev/sda) in the
